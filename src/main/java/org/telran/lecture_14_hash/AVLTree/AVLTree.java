@@ -1,10 +1,11 @@
-package org.telran.lecture_13_bst.practice;
+package org.telran.lecture_14_hash.AVLTree;
 
 class Node {
     int key;
     String value;
     Node left;
     Node right;
+    Node parent;
     int balanceFactor;
 
     /**
@@ -18,9 +19,8 @@ class Node {
         this.value = value;
         this.left = null;
         this.right = null;
+        this.parent = null;
         this.balanceFactor = 0;
-        // TODO: добавить отслеживание баланса this.balanceFactor = 0;
-        //  Реализовать обновление при вставке
     }
 }
 
@@ -29,6 +29,7 @@ public class AVLTree {
     Node root;
     private int length = 0;
     private boolean isBalanced;
+    boolean showDetails;
 
     /**
      * Конструктор для создания нового бинарного дерева поиска.
@@ -36,6 +37,13 @@ public class AVLTree {
     public AVLTree() {
         this.root = null;
         this.isBalanced = true;
+        this.showDetails = false;
+    }
+
+    public AVLTree(boolean showDetails) {
+        this.root = null;
+        this.isBalanced = true;
+        this.showDetails = showDetails;
     }
 
     /**
@@ -45,16 +53,15 @@ public class AVLTree {
      * @param value Значение нового узла.
      */
     public void insert(int key, String value) {
-
         Node newNode = new Node(key, value);
         if (root == null) {
             root = newNode;
             length++;
-            this.updateBalanceFactor(root);
         } else {
             insertNode(root, newNode);
         }
     }
+
 
     /**
      * Рекурсивно вставляет новый узел в поддерево.
@@ -63,22 +70,23 @@ public class AVLTree {
      * @param newNode Новый узел.
      */
     private void insertNode(Node node, Node newNode) {
-        // TODO-1[complete]: Доработайте код, чтобы все ключи были уникальные.
         if (newNode.key < node.key) {
             if (node.left == null) {
                 node.left = newNode;
+                newNode.parent = node;
                 length++;
-                this.updateBalanceFactor(root);
+                updateBalancePath(newNode); // Балансируем от newNode вверх
             } else {
                 insertNode(node.left, newNode);
             }
         } else if (newNode.key > node.key) {
             if (node.right == null) {
                 node.right = newNode;
+                newNode.parent = node;
                 length++;
-                this.updateBalanceFactor(root);
+                updateBalancePath(newNode); // Балансируем от newNode вверх
             } else {
-                this.insertNode(node.right, newNode);
+                insertNode(node.right, newNode);
             }
         } else { // Найдена дублирующая Нода
             node.value = newNode.value;
@@ -104,8 +112,6 @@ public class AVLTree {
      * @return Найденный узел или null, если узел не найден.
      */
     private Node searchNode(Node node, int key) {
-        // TODO-3[complete]: напишите реализацию метода
-
         if (node == null) {
             return null;
         }
@@ -125,7 +131,6 @@ public class AVLTree {
      * @return Минимальный узел или null, если дерево пустое.
      */
     public Node min() {
-        // TODO-4[complete]: напишите реализацию метода
         if (root == null) {
             return null;
         }
@@ -134,6 +139,13 @@ public class AVLTree {
             currentNode = currentNode.left;
         }
         return currentNode;
+    }
+
+    private Node min(Node node) {
+        while (node.left != null) {
+            node = node.left;
+        }
+        return node;
     }
 
     /**
@@ -147,35 +159,167 @@ public class AVLTree {
     }
 
     public int length() {
-        // TODO-2[complete]: реализуйте метод, возвращающий количество узлов в дереве
         return length;
     }
 
 
-    private int getHeight(Node node) {
-        if (node == null) {
-            return 0;
+    private void updateBalancePath(Node node) {
+        while (node != null) {
+            updateBalanceFactor(node);
+            balance(node);
+            node = node.parent;
         }
-        return Math.max(this.getHeight(node.left), this.getHeight(node.right)) + 1;
-
     }
 
     private void updateBalanceFactor(Node node) {
+        node.balanceFactor = getNodeHeight(node.right) - getNodeHeight(node.left);
+    }
+
+    private int getNodeHeight(Node node) {
         if (node == null) {
-            return;
+            return 0;
         }
-        node.balanceFactor = this.getHeight(node.right) - this.getHeight(node.left);
-        if (node.balanceFactor > 1 || node.balanceFactor < -1) {
-            this.isBalanced = false;
-        }
-        // console.log("key:", node.key, "bf:", node.balanceFactor);
-        this.updateBalanceFactor(node.right);
-        this.updateBalanceFactor(node.left);
+        return Math.max(getNodeHeight(node.left), getNodeHeight(node.right)) + 1;
     }
 
     public boolean isBalanced() {
         return this.isBalanced;
     }
+
+    private void balance(Node node) {
+        if (node == null) {
+            return;
+        }
+
+        if (node.balanceFactor > 1) {
+            if (node.right.balanceFactor < 0) {
+                node.right = rightRotate(node.right);
+            }
+            node = leftRotate(node);
+        } else if (node.balanceFactor < -1) {
+            if (node.left.balanceFactor > 0) {
+                node.left = leftRotate(node.left);
+            }
+            node = rightRotate(node);
+        }
+
+        // Обновляем баланс фактор родителя после поворота.
+        if (node.left != null) {
+            updateBalanceFactor(node.left);
+        }
+        if (node.right != null) {
+            updateBalanceFactor(node.right);
+        }
+        updateBalanceFactor(node);
+
+        // Если node был корнем, то необходимо обновить root.
+        if (node.parent == null) {
+            root = node;
+        }
+    }
+
+    private Node leftRotate(Node node) {
+        if (showDetails) {
+            System.out.println("leftRotate");
+            displayTree();
+        }
+
+        Node rightChild = node.right;
+        node.right = rightChild.left;
+
+        if (rightChild.left != null) {
+            rightChild.left.parent = node;
+        }
+
+        rightChild.left = node;
+        rightChild.parent = node.parent;
+        node.parent = rightChild;
+
+        if (rightChild.parent != null) {
+            if (rightChild.parent.left == node) {
+                rightChild.parent.left = rightChild;
+            } else {
+                rightChild.parent.right = rightChild;
+            }
+        }
+
+        updateBalanceFactor(node);
+        updateBalanceFactor(rightChild);
+
+        return rightChild;
+    }
+
+    private Node rightRotate(Node node) {
+        if (showDetails) {
+            System.out.println("rightRotate");
+            displayTree();
+        }
+
+        Node leftChild = node.left;
+        node.left = leftChild.right;
+
+        if (leftChild.right != null) {
+            leftChild.right.parent = node;
+        }
+
+        leftChild.right = node;
+        leftChild.parent = node.parent;
+        node.parent = leftChild;
+
+        if (leftChild.parent != null) {
+            if (leftChild.parent.left == node) {
+                leftChild.parent.left = leftChild;
+            } else {
+                leftChild.parent.right = leftChild;
+            }
+        }
+
+        updateBalanceFactor(node);
+        updateBalanceFactor(leftChild);
+
+        return leftChild;
+    }
+
+    public void remove(int key) {
+        Node nodeToRemove = searchNode(root, key);
+        if (nodeToRemove == null) {
+            return; // Узел не найден
+        }
+        removeNode(nodeToRemove);
+    }
+
+    private void removeNode(Node nodeToRemove) {
+        Node replacementNode;
+        Node parent = nodeToRemove.parent;
+
+        if (nodeToRemove.left == null || nodeToRemove.right == null) {
+            replacementNode = nodeToRemove.left != null ? nodeToRemove.left : nodeToRemove.right;
+        } else {
+            replacementNode = min(nodeToRemove.right);
+            nodeToRemove.key = replacementNode.key;
+            nodeToRemove.value = replacementNode.value;
+            removeNode(replacementNode); // Рекурсивно удаляем узел замены
+            updateBalancePath(nodeToRemove);
+            length--;
+            return;
+        }
+
+        if (replacementNode != null) {
+            replacementNode.parent = parent;
+        }
+
+        if (parent == null) {
+            root = replacementNode;
+        } else if (parent.left == nodeToRemove) {
+            parent.left = replacementNode;
+        } else {
+            parent.right = replacementNode;
+        }
+
+        updateBalancePath(parent);
+        length--;
+    }
+
 
     /**
      * Отображает дерево в виде древовидной структуры в терминале.
@@ -212,18 +356,19 @@ public class AVLTree {
 
     public static void main(String[] args) {
         AVLTree tree = new AVLTree();
-        tree.insert(3, "1");
-        tree.insert(12, "1");
-        tree.insert(2, "1");
+        tree.insert(50, "1");
+        tree.insert(60, "1");
+        tree.insert(10, "1");
+        tree.insert(8, "1");
+        tree.insert(20, "1");
         tree.insert(15, "1");
-        tree.insert(16, "1");
 
+        System.out.println("result tree");
         tree.displayTree();
-//        Node minNode = tree.min();
-//        if (minNode == null) {
-//            System.out.println("Дерево пустое");
-//        }else {
-//            System.out.println(minNode.key + ":" + minNode.value );
+
+        tree.remove(50);
+        tree.displayTree();
+
     }
 
 }
